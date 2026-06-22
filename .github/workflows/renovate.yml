@@ -1,0 +1,56 @@
+# Migrated from azure-pipelines_renovate.yml
+#
+# Migration notes:
+#   - AdvancedSecurity-Dependency-Scanning@1: Replaced by GitHub Dependabot.
+#     Enable Dependabot alerts and security updates in the repository settings
+#     (Security > Code security and analysis) — no explicit workflow step required.
+#   - BuildQualityChecks@9 (warningFailOption: fixed, warningThreshold: 10): No direct
+#     GitHub Actions equivalent. To enforce warning limits on dotnet build, add
+#     `-p:TreatWarningsAsErrors=true` or `-maxwarns 10` to the build step, or use a
+#     custom script that parses MSBuild diagnostic output.
+#   - system_accesstoken (System.AccessToken): Replaced by RENOVATE_TOKEN secret.
+#     Create a GitHub PAT (with repo and workflow scopes) and store it as
+#     RENOVATE_TOKEN in repository/org secrets.
+
+name: Renovate
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: '0 2 * * *'  # 02:00 UTC daily
+  workflow_dispatch:
+
+env:
+  BUILD_CONFIGURATION: Release
+  SOLUTION_PATH: TailwindTraders.Website/Source
+
+jobs:
+  build-and-renovate:
+    name: Build and Renovate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@3e891b0cb619bf60e2c25674b222b8940e2c1c25 # v4.1.0
+        with:
+          dotnet-version: '8.x'
+
+      - name: dotnet build ${{ env.BUILD_CONFIGURATION }}
+        run: dotnet build ${{ env.SOLUTION_PATH }} --configuration ${{ env.BUILD_CONFIGURATION }}
+
+      - name: Setup Node.js 22.x
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22.x'
+
+      - name: Run Renovate
+        uses: renovatebot/github-action@a4b7e8c10ef5e5614c6ceac36b2a29e62de2f11b # v40.3.5
+        with:
+          renovate-version: '40.3.5'
+        env:
+          RENOVATE_TOKEN: ${{ secrets.RENOVATE_TOKEN }}
