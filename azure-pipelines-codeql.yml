@@ -1,0 +1,38 @@
+trigger:
+- main
+pr:
+- main
+
+variables:
+  BuildConfiguration: "Release"
+  BuildPlatform: "any cpu"
+  Parameters.RestoreBuildProjects: "**/*.csproj"
+  Parameters.TestProjects: "**/*[Tt]ests/*.csproj"
+
+  advancedsecurity.submittoadvancedsecurity: true
+
+pool:
+  vmImage: windows-latest
+
+stages:
+- stage: 'Build'
+  displayName: 'Build'
+  jobs:
+  - job: 
+    displayName: 'Build on Windows'
+    steps:
+    - task: NodeTool@0
+      displayName: 'Use Node 10.16.3'
+      inputs:
+        versionSpec: 10.16.3
+  
+    - task: AdvancedSecurity-Codeql-Init@1
+      inputs:
+        enableAutomaticCodeQLInstall: true
+        languages: 'csharp, javascript'
+        querysuite: 'security-extended'
+
+    - task: AdvancedSecurity-Codeql-Autobuild@1
+    - task: AdvancedSecurity-Codeql-Analyze@1
+      inputs:
+        WaitForProcessing: true

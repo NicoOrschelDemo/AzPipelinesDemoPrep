@@ -1,0 +1,38 @@
+trigger:
+  branches:
+    include:
+    - main
+variables:
+- name: buildConfiguration
+  value: 'Release'
+- name: solutionPath
+  value: 'TailwindTraders.Website/Source'
+- name: system_accesstoken
+  value: $(System.AccessToken)
+stages:
+- stage: __default
+  jobs:
+  - job: Job
+    pool:
+      vmImage: ubuntu-latest
+    steps:
+    - task: CmdLine@2
+      displayName: 'dotnet build $(buildConfiguration)'
+      inputs:
+        script: dotnet build $(solutionPath) --configuration $(buildConfiguration)
+    - task: AdvancedSecurity-Dependency-Scanning@1
+    - task: BuildQualityChecks@9
+      inputs:
+        checkWarnings: true
+        warningFailOption: 'fixed'
+        warningThreshold: '10'
+        showStatistics: true
+        warningTaskFilters: '/^(AdvancedSecurity-Dependency-Scanning)$/i'
+    - task: NodeTool@0
+      inputs:
+        versionSource: 'spec'
+        versionSpec: '20.x'
+    - task: RenovateMe@1
+      inputs:
+        renovateOptionsVersion: 'latest'
+
