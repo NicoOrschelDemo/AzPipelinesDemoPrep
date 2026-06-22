@@ -1,0 +1,48 @@
+name: Renovate
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+env:
+  BUILD_CONFIGURATION: 'Release'
+  SOLUTION_PATH: 'TailwindTraders.Website/Source'
+
+jobs:
+  renovate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: dotnet build ${{ env.BUILD_CONFIGURATION }}
+        run: dotnet build ${{ env.SOLUTION_PATH }} --configuration ${{ env.BUILD_CONFIGURATION }}
+
+      # Azure DevOps AdvancedSecurity-Dependency-Scanning@1 equivalent:
+      # GitHub Dependabot handles dependency vulnerability scanning natively at the repository level.
+      # For pull request dependency review, add actions/dependency-review-action to a pull_request workflow.
+
+      # Azure DevOps BuildQualityChecks@9 equivalent:
+      # No direct GitHub Actions equivalent. Warning thresholds can be enforced via build scripts
+      # or custom MSBuild properties (e.g., TreatWarningsAsErrors, WarningsAsErrors).
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run Renovate
+        uses: renovatebot/github-action@v40
+        env:
+          # Use a Personal Access Token (PAT) with repo scope stored as RENOVATE_TOKEN secret,
+          # or GITHUB_TOKEN for same-repository updates only.
+          RENOVATE_TOKEN: ${{ secrets.RENOVATE_TOKEN }}
