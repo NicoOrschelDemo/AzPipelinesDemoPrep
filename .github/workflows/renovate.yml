@@ -1,0 +1,57 @@
+# Migrated from azure-pipelines_renovate.yml
+# Original pipeline: Build, dependency scan, and run Renovate bot
+
+name: Renovate
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  BUILD_CONFIGURATION: Release
+  SOLUTION_PATH: TailwindTraders.Website/Source
+
+jobs:
+  build-and-renovate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      security-events: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: dotnet build ${{ env.BUILD_CONFIGURATION }}
+        run: dotnet build ${{ env.SOLUTION_PATH }} --configuration ${{ env.BUILD_CONFIGURATION }}
+
+      # Replaces AdvancedSecurity-Dependency-Scanning@1
+      # GitHub Advanced Security dependency scanning is handled natively by GitHub
+      # (Dependabot alerts and dependency graph). The action below provides
+      # dependency review on pushes; configure Dependabot in .github/dependabot.yml
+      # for automated PR-level dependency review.
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+
+      # NOTE: BuildQualityChecks@9 has no direct GitHub Actions equivalent.
+      # That Azure DevOps extension checked warning counts from prior tasks.
+      # Consider implementing a custom warning-threshold check if required.
+
+      - name: Setup Node.js 22.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+
+      # Replaces RenovateMe@1
+      # Requires a secret RENOVATE_TOKEN (Personal Access Token or GitHub App token)
+      # with repo read/write permissions to create dependency-update PRs.
+      - name: Run Renovate
+        uses: renovatebot/github-action@v41
+        with:
+          configurationFile: renovate.json
+        env:
+          RENOVATE_TOKEN: ${{ secrets.RENOVATE_TOKEN }}
