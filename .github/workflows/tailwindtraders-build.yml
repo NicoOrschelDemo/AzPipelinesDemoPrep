@@ -1,0 +1,53 @@
+name: Tailwind Traders Build
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build on Windows
+    runs-on: windows-latest
+    env:
+      BUILD_CONFIGURATION: Release
+      SOLUTION_PATH: TailwindTraders.Website/Source/Tailwind.Traders.Web.sln
+      CLIENT_APP_PATH: TailwindTraders.Website/Source/Tailwind.Traders.Web/ClientApp
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 10.16.3
+        uses: actions/setup-node@v4
+        with:
+          node-version: 10.16.3
+
+      - name: npm install
+        working-directory: ${{ env.CLIENT_APP_PATH }}
+        run: npm install
+
+      - name: Setup .NET 5 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 5.0.x
+
+      - name: Restore
+        run: dotnet restore ${{ env.SOLUTION_PATH }}
+
+      - name: Build
+        run: dotnet build ${{ env.SOLUTION_PATH }} --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
+
+      - name: Test
+        shell: pwsh
+        run: |
+          $testProjects = Get-ChildItem -Path "TailwindTraders.Website/Source" -Recurse -Filter *.csproj |
+            Where-Object { $_.DirectoryName -match '(^|[\\/])[Tt]ests?([\\/]|$)' }
+          if (-not $testProjects) {
+            Write-Host "No test projects found."
+            exit 0
+          }
+
+          foreach ($testProject in $testProjects) {
+            dotnet test $testProject.FullName --configuration $env:BUILD_CONFIGURATION --no-build
+          }
