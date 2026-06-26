@@ -55,5 +55,5 @@ jobs:
           }
 
           foreach ($testProject in $testProjects) {
-            dotnet test $testProject.FullName --configuration $env:BUILD_CONFIGURATION --no-build
+            dotnet test $testProject.FullName --configuration $env:BUILD_CONFIGURATION
           }
