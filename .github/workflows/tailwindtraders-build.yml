@@ -45,7 +45,7 @@ jobs:
         shell: pwsh
         run: |
           $testProjects = Get-ChildItem -Path "TailwindTraders.Website/Source" -Recurse -Filter *.csproj |
-            Where-Object { $_.DirectoryName -match '(^|[\\/])[Tt]ests?([\\/]|$)' }
+            Where-Object { $_.DirectoryName -match '(^|[\\/])[Tt]ests([\\/]|$)' }
           if (-not $testProjects) {
             Write-Host "No test projects found."
             exit 0
