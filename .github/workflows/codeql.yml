@@ -51,11 +51,31 @@ jobs:
         with:
           languages: csharp, javascript
           queries: security-extended
-
+      
       # AdvancedSecurity-Codeql-Autobuild@1 → github/codeql-action/autobuild v4.36.2
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@8aad20d150bbac5944a9f9d289da16a4b0d87c1e
+      #- name: Autobuild
+      #  uses: github/codeql-action/autobuild@8aad20d150bbac5944a9f9d289da16a4b0d87c1e
+      
+      # DotNetCoreCLI@2 (restore) → actions/setup-dotnet + dotnet restore
+      # actions/setup-dotnet v5.4.0
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
 
+      # DotNetCoreCLI@2 supports glob expansion internally; replicate with PowerShell Get-ChildItem
+      - name: Restore
+        shell: pwsh
+        run: |
+          Get-ChildItem -Recurse -Filter "*.csproj" | ForEach-Object {
+            dotnet restore $_.FullName
+          }
+          
+      # DotNetCoreCLI@2 (build) → dotnet build
+      - name: Build
+        shell: pwsh
+        run: |
+          Get-ChildItem -Recurse -Filter "*.csproj" | ForEach-Object {
+            dotnet build $_.FullName --configuration ${{ env.BUILD_CONFIGURATION }}
+          }
+            
       # AdvancedSecurity-Codeql-Analyze@1 → github/codeql-action/analyze v4.36.2
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@8aad20d150bbac5944a9f9d289da16a4b0d87c1e
