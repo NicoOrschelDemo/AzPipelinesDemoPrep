@@ -1,0 +1,64 @@
+name: Tailwind Traders Build
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  # Non-sensitive build configuration variables (migrated from Azure DevOps pipeline variables)
+  BUILD_CONFIGURATION: "Release"
+  BUILD_PLATFORM: "any cpu"
+
+jobs:
+  build:
+    name: Build on Windows
+    runs-on: windows-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      # actions/checkout v7.0.0
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+
+      # NodeTool@0 → actions/setup-node v6.4.0
+      - name: Use Node 10.16.3
+        # actions/setup-node v6.4.0
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "10.16.3"
+
+      # Npm@1 (npm install) → run: npm install
+      - name: npm install
+        run: npm install
+        working-directory: TailwindTraders.Website/Source/Tailwind.Traders.Web/ClientApp
+
+      # DotNetCoreCLI@2 (restore) → actions/setup-dotnet + dotnet restore
+      # actions/setup-dotnet v5.4.0
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
+
+      # DotNetCoreCLI@2 supports glob expansion internally; replicate with PowerShell Get-ChildItem
+      - name: Restore
+        shell: pwsh
+        run: |
+          Get-ChildItem -Recurse -Filter "*.csproj" | ForEach-Object {
+            dotnet restore $_.FullName
+          }
+
+      # DotNetCoreCLI@2 (build) → dotnet build
+      - name: Build
+        shell: pwsh
+        run: |
+          Get-ChildItem -Recurse -Filter "*.csproj" | ForEach-Object {
+            dotnet build $_.FullName --configuration ${{ env.BUILD_CONFIGURATION }}
+          }
+
+      # DotNetCoreCLI@2 (test) → dotnet test
+      # Pattern **/*[Tt]ests/*.csproj matches test projects in *Tests/ subdirectories
+      - name: Test
+        shell: pwsh
+        run: |
+          Get-ChildItem -Recurse -Filter "*.csproj" | Where-Object { $_.DirectoryName -match "[Tt]ests$" } | ForEach-Object {
+            dotnet test $_.FullName --configuration ${{ env.BUILD_CONFIGURATION }}
+          }
