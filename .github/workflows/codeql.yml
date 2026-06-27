@@ -49,7 +49,6 @@ jobs:
       # actions/setup-dotnet v5.4.0
       - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
 
-
       # AdvancedSecurity-Codeql-Init@1 → github/codeql-action/init v4.36.2
       - name: Initialize CodeQL
         uses: github/codeql-action/init@8aad20d150bbac5944a9f9d289da16a4b0d87c1e
