@@ -1,0 +1,76 @@
+name: tailwindtraders-build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  BUILD_CONFIGURATION: Release
+  BUILD_PLATFORM: any cpu
+  DOTNET_VERSION: 5.x
+  NODE_VERSION: 10.16.3
+  PROJECT_PATH: TailwindTraders.Website/Source/Tailwind.Traders.Web/Tailwind.Traders.Web.csproj
+  ASSEMBLY_VERSION: 2.0.${{ github.run_number }}
+
+jobs:
+  build:
+    name: Build on Windows
+    runs-on: windows-latest
+
+    steps:
+      # actions/checkout v7.0.0
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          fetch-depth: 0
+
+      # actions/setup-node v6.4.0
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # actions/setup-dotnet v5.4.0
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: npm install
+        working-directory: TailwindTraders.Website/Source/Tailwind.Traders.Web/ClientApp
+        run: npm install --no-audit --no-fund
+
+      - name: Restore
+        run: dotnet restore ${{ env.PROJECT_PATH }}
+
+      - name: Build
+        run: |
+          dotnet build ${{ env.PROJECT_PATH }} --configuration ${{ env.BUILD_CONFIGURATION }} /p:Version=${{ env.ASSEMBLY_VERSION }} /p:AssemblyVersion=${{ env.ASSEMBLY_VERSION }} /p:FileVersion=${{ env.ASSEMBLY_VERSION }} /p:InformationalVersion=${{ env.ASSEMBLY_VERSION }}
+
+      - name: Discover test projects
+        id: discover-tests
+        shell: pwsh
+        run: |
+          $projects = Get-ChildItem -Path . -Recurse -Filter *.csproj |
+            Where-Object { $_.FullName -match '[Tt]ests' } |
+            Select-Object -ExpandProperty FullName
+
+          if ($projects) {
+            Write-Output "test_projects=$($projects -join ';')" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          } else {
+            Write-Output "test_projects=" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          }
+
+      - name: Test
+        if: steps.discover-tests.outputs.test_projects != ''
+        run: |
+          $projects = "${{ steps.discover-tests.outputs.test_projects }}".Split(';')
+          foreach ($project in $projects) {
+            if ([string]::IsNullOrWhiteSpace($project)) { continue }
+            dotnet test $project --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
+          }
