@@ -1,13 +1,18 @@
+name: $(MajorVersion).$(MinorVersion).$(Rev:r)
+
 trigger:
 - main
 
 variables:
+  resource-group: "ghazdo-workshops"
   BuildConfiguration: "Release"
   BuildPlatform: "any cpu"
   Parameters.RestoreBuildProjects: "**/*.csproj"
   Parameters.TestProjects: "**/*[Tt]ests/*.csproj"
-
+  webapp_name: tailwind-github-demo
   advancedsecurity.submittoadvancedsecurity: true
+  majorVersion: 2
+  minorVersion: 0
 
 pool:
   vmImage: windows-latest
@@ -23,6 +28,11 @@ stages:
       displayName: 'Use Node 10.16.3'
       inputs:
         versionSpec: 10.16.3
+        
+    - task: UseDotNet@2
+      inputs:
+        packageType: 'sdk'
+        version: '5.x'
   
     - task: Npm@1
       displayName: 'npm install'
@@ -36,11 +46,39 @@ stages:
         command: restore
         projects: '$(Parameters.RestoreBuildProjects)'
 
+    - powershell: |
+        $project = "$(Build.SourcesDirectory)\TailwindTraders.Website\Source\Tailwind.Traders.Web"
+
+        $version = "$(Build.BuildNumber)"
+
+        @"
+        using System.Reflection;
+
+        [assembly: AssemblyVersion("$version")]
+        [assembly: AssemblyFileVersion("$version")]
+        [assembly: AssemblyInformationalVersion("$version")]
+        "@ | Set-Content (Join-Path $project "GeneratedAssemblyInfo.cs")
+      displayName: Generate AssemblyInfo.cs
+
+    - task: VersionAssemblies@2
+      inputs:
+        filePattern: '**/AssemblyInfo.cs'
+        versionSource: 'buildNumber'
+        versionFormat: 'threeParts'
+        replaceVersionFormat: 'threeParts'
+        failIfNoMatchFound: true
+
     - task: DotNetCoreCLI@2
       displayName: Build
       inputs:
         projects: '$(Parameters.RestoreBuildProjects)'
         arguments: '--configuration $(BuildConfiguration)'
+
+    - task: AdvancedSecurity-Dependency-Scanning@1
+      displayName: 'Dependency Scanning'
+      
+    - task: AdvancedSecurity-Publish@1
+      displayName: 'Dependency Publish'
     
     - task: DotNetCoreCLI@2
       displayName: Test
@@ -48,3 +86,5 @@ stages:
         command: test
         projects: '$(Parameters.TestProjects)'
         arguments: '--configuration $(BuildConfiguration)'
+
+    - script: echo 'Deployment with secret $(publishKey)'   
