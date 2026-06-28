@@ -71,12 +71,15 @@ jobs:
         run: |
           $version = "${{ env.MAJOR_VERSION }}.${{ env.MINOR_VERSION }}.${{ github.run_number }}"
           $files = Get-ChildItem -Path . -Filter "AssemblyInfo.cs" -Recurse
-          if ($files.Count -eq 0) { Write-Error "No AssemblyInfo.cs files found"; exit 1 }
-          $files | ForEach-Object {
-            $content = Get-Content $_.FullName -Raw
-            $content = $content -replace 'AssemblyVersion\("[^"]*"\)', "AssemblyVersion(`"$version`")"
-            $content = $content -replace 'AssemblyFileVersion\("[^"]*"\)', "AssemblyFileVersion(`"$version`")"
-            Set-Content $_.FullName $content
+          if ($files.Count -eq 0) {
+            Write-Host "No AssemblyInfo.cs files found — skipping version replacement (version is set via GeneratedAssemblyInfo.cs)"
+          } else {
+            $files | ForEach-Object {
+              $content = Get-Content $_.FullName -Raw
+              $content = $content -replace 'AssemblyVersion\("[^"]*"\)', "AssemblyVersion(`"$version`")"
+              $content = $content -replace 'AssemblyFileVersion\("[^"]*"\)', "AssemblyFileVersion(`"$version`")"
+              Set-Content $_.FullName $content
+            }
           }
 
       # DotNetCoreCLI@2 (build) → dotnet build

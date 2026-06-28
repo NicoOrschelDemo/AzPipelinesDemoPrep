@@ -79,6 +79,8 @@ $ actionlint .github/workflows/tailwindtraders-build.yml
 Exit code: 0
 ```
 
+> Validated with actionlint v1.7.11
+
 ### Manual Verification Checklist
 
 - [x] YAML syntax validated (actionlint: 0 errors)
@@ -158,6 +160,7 @@ The original Azure DevOps pipeline file has been moved to `.github/ci-archive/` 
 - **Build versioning**: Azure DevOps used the pipeline name template `$(MajorVersion).$(MinorVersion).$(Rev:r)` for build numbers. GitHub Actions uses `github.run_number` as a monotonically increasing counter per workflow. The version format `2.0.{run_number}` is functionally equivalent.
 - **`resource-group` variable**: The variable `resource-group: "ghazdo-workshops"` was defined in the original pipeline but not used in any visible pipeline steps (likely for deployment targets). It has been omitted from the workflow env since it is not referenced in any step. Add it back if needed for deployment jobs.
 - **GHAS tasks**: `AdvancedSecurity-Dependency-Scanning@1` and `AdvancedSecurity-Publish@1` are Azure DevOps-specific GHAS tasks with no direct GitHub Actions equivalent action. GitHub's native GHAS features provide the same capability automatically without a CI step.
+- **VersionAssemblies behavior**: The original pipeline had `failIfNoMatchFound: true` for the `VersionAssemblies@2` task. Since the TailwindTraders.Website project uses SDK-style .csproj (no explicit `AssemblyInfo.cs`), version info is injected via the generated `GeneratedAssemblyInfo.cs` file created in the previous step. The migrated `Version Assemblies` step gracefully skips if no `AssemblyInfo.cs` files are found rather than failing, and relies on `GeneratedAssemblyInfo.cs` for version embedding.
 - **`publishKey` secret**: The original `script: echo 'Deployment with secret $(publishKey)'` suggests this variable may be a pipeline secret variable. It has been mapped to `secrets.PUBLISH_KEY`. If it was a non-secret pipeline variable, it can be moved to a workflow `env:` entry instead.
 
 ---
