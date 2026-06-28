@@ -1,0 +1,97 @@
+name: Tailwind Traders Build
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  BUILD_CONFIGURATION: Release
+  BUILD_PLATFORM: "any cpu"
+  RESTORE_BUILD_PROJECTS: "**/*.csproj"
+  TEST_PROJECTS: "**/*[Tt]ests/*.csproj"
+  WEBAPP_NAME: tailwind-github-demo
+  MAJOR_VERSION: "2"
+  MINOR_VERSION: "0"
+
+jobs:
+  build:
+    name: Build on Windows
+    runs-on: windows-latest
+    permissions:
+      contents: read
+
+    steps:
+      # actions/checkout v7.0.0
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+
+      # NodeTool@0 → actions/setup-node v6.4.0
+      - name: Use Node 10.16.3
+        # actions/setup-node v6.4.0
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "10.16.3"
+          cache: "npm"
+          cache-dependency-path: TailwindTraders.Website/Source/Tailwind.Traders.Web/ClientApp/package-lock.json
+
+      # UseDotNet@2 → actions/setup-dotnet v5.4.0
+      - name: Setup .NET SDK 5.x
+        # actions/setup-dotnet v5.4.0
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
+        with:
+          dotnet-version: "5.x"
+          cache: true
+
+      # Npm@1 → run: npm install
+      - name: npm install
+        working-directory: TailwindTraders.Website/Source/Tailwind.Traders.Web/ClientApp
+        run: npm install
+
+      # DotNetCoreCLI@2 (restore) → dotnet restore
+      - name: Restore
+        run: dotnet restore "${{ env.RESTORE_BUILD_PROJECTS }}"
+
+      # PowerShell → Generate AssemblyInfo.cs with build version
+      - name: Generate AssemblyInfo.cs
+        shell: pwsh
+        run: |
+          $project = "${{ github.workspace }}\TailwindTraders.Website\Source\Tailwind.Traders.Web"
+          $version = "${{ env.MAJOR_VERSION }}.${{ env.MINOR_VERSION }}.${{ github.run_number }}"
+          @"
+          using System.Reflection;
+
+          [assembly: AssemblyVersion("$version")]
+          [assembly: AssemblyFileVersion("$version")]
+          [assembly: AssemblyInformationalVersion("$version")]
+          "@ | Set-Content (Join-Path $project "GeneratedAssemblyInfo.cs")
+
+      # VersionAssemblies@2 → PowerShell regex replace on AssemblyInfo.cs files
+      - name: Version Assemblies
+        shell: pwsh
+        run: |
+          $version = "${{ env.MAJOR_VERSION }}.${{ env.MINOR_VERSION }}.${{ github.run_number }}"
+          $files = Get-ChildItem -Path . -Filter "AssemblyInfo.cs" -Recurse
+          if ($files.Count -eq 0) { Write-Error "No AssemblyInfo.cs files found"; exit 1 }
+          $files | ForEach-Object {
+            $content = Get-Content $_.FullName -Raw
+            $content = $content -replace 'AssemblyVersion\("[^"]*"\)', "AssemblyVersion(`"$version`")"
+            $content = $content -replace 'AssemblyFileVersion\("[^"]*"\)', "AssemblyFileVersion(`"$version`")"
+            Set-Content $_.FullName $content
+          }
+
+      # DotNetCoreCLI@2 (build) → dotnet build
+      - name: Build
+        run: dotnet build "${{ env.RESTORE_BUILD_PROJECTS }}" --configuration ${{ env.BUILD_CONFIGURATION }}
+
+      # AdvancedSecurity-Dependency-Scanning@1 + AdvancedSecurity-Publish@1 →
+      # GitHub Advanced Security provides dependency scanning natively via Dependabot alerts
+      # and the dependency graph. Enable in repository Settings > Security > Code security and analysis.
+      # For pull request dependency review, add the actions/dependency-review-action workflow separately.
+
+      # DotNetCoreCLI@2 (test) → dotnet test
+      - name: Test
+        run: dotnet test "${{ env.TEST_PROJECTS }}" --configuration ${{ env.BUILD_CONFIGURATION }}
+
+      # script → run (publishKey mapped to GitHub Secret)
+      - name: Deployment step
+        run: echo 'Deployment with secret ${{ secrets.PUBLISH_KEY }}'
