@@ -87,17 +87,32 @@ stages:
         projects: '$(Parameters.TestProjects)'
         arguments: '--configuration $(BuildConfiguration)'
 
-- stage: 'Deploy'
-  displayName: 'Deploy'
+- stage: 'Deploy_Server'
+  displayName: 'Deploy Server'
   dependsOn: Build
   condition: succeeded()
   jobs:
   - deployment: DeployWithSecret
     displayName: 'Deploy with secret'
-    environment: 'dev'
+    environment: 'prod_server'
     strategy:
       runOnce:
         deploy:
           steps:
-          - script: echo 'Deployment with secret $(publishKey)'
+          - script: echo 'ServerDeployment with secret $(publishKey)'
+            displayName: 'Deployment with secret'
+
+- stage: 'Deploy_Client'
+  displayName: 'Deploy Server'
+  dependsOn: [Build, Deploy_Server]
+  condition: succeeded()
+  jobs:
+  - deployment: DeployWithSecret
+    displayName: 'Deploy with secret'
+    environment: 'prod_client'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - script: echo 'Client Deployment with secret $(publishKey)'
             displayName: 'Deployment with secret'
