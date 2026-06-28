@@ -1,0 +1,84 @@
+name: TailwindTraders Build
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  BUILD_CONFIGURATION: Release
+  BUILD_PLATFORM: any cpu
+  RESTORE_BUILD_PROJECTS: '**/*.csproj'
+  TEST_PROJECTS: '**/*[Tt]ests/*.csproj'
+  WEBAPP_NAME: tailwind-github-demo
+  MAJOR_VERSION: '2'
+  MINOR_VERSION: '0'
+  # resource-group: ghazdo-workshops (available as repository variable if needed for deployment steps)
+
+jobs:
+  build:
+    name: Build on Windows
+    runs-on: windows-latest
+    permissions:
+      contents: read
+
+    steps:
+      # actions/checkout v7.0.0
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+
+      # actions/setup-node v6.4.0
+      # NOTE: Node 10.16.3 is end-of-life (since April 2021). Upgrade to an LTS version (18.x or 20.x) is recommended.
+      - name: Use Node 10.16.3
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '10.16.3'
+
+      # actions/setup-dotnet v5.4.0
+      # NOTE: .NET 5.x is end-of-support (since May 2022). Upgrade to .NET 8 (LTS) or later is recommended.
+      - name: Use .NET SDK 5.x
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
+        with:
+          dotnet-version: '5.x'
+
+      - name: npm install
+        run: npm install
+        working-directory: TailwindTraders.Website/Source/Tailwind.Traders.Web/ClientApp
+
+      - name: Restore
+        run: dotnet restore ${{ env.RESTORE_BUILD_PROJECTS }}
+
+      - name: Generate AssemblyInfo.cs
+        shell: pwsh
+        run: |
+          $project = "${{ github.workspace }}\TailwindTraders.Website\Source\Tailwind.Traders.Web"
+          $version = "${{ env.MAJOR_VERSION }}.${{ env.MINOR_VERSION }}.${{ github.run_number }}"
+          @"
+          using System.Reflection;
+
+          [assembly: AssemblyVersion("$version")]
+          [assembly: AssemblyFileVersion("$version")]
+          [assembly: AssemblyInformationalVersion("$version")]
+          "@ | Set-Content (Join-Path $project "GeneratedAssemblyInfo.cs")
+
+      # mingjun97/file-regex-replace v1 — equivalent to VersionAssemblies@2
+      # Replaces version strings in AssemblyInfo.cs files using the build number
+      - name: Version Assemblies
+        uses: mingjun97/file-regex-replace@7d8ae0144cd6660fe8ca5a938ae71ea816a06f47
+        with:
+          regex: '\d+\.\d+\.\d+'
+          replacement: '${{ env.MAJOR_VERSION }}.${{ env.MINOR_VERSION }}.${{ github.run_number }}'
+          include: '**/AssemblyInfo.cs'
+          flags: 'g'
+
+      - name: Build
+        run: dotnet build ${{ env.RESTORE_BUILD_PROJECTS }} --configuration ${{ env.BUILD_CONFIGURATION }}
+
+      # AdvancedSecurity-Dependency-Scanning@1 and AdvancedSecurity-Publish@1 are Azure DevOps
+      # Advanced Security tasks. On GitHub, dependency scanning is handled natively by Dependabot
+      # when GitHub Advanced Security is enabled — no explicit workflow step is required.
+
+      - name: Test
+        run: dotnet test ${{ env.TEST_PROJECTS }} --configuration ${{ env.BUILD_CONFIGURATION }}
+
+      - name: Deployment step with secret
+        run: echo "Deployment with secret ${{ secrets.PUBLISH_KEY }}"
