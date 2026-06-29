@@ -1,0 +1,49 @@
+# This workflow will build a .NET project
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-net
+
+name: Tailwind Build
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  resource-group: "ghazdo-workshops"
+  BuildConfiguration: "Release"
+  BuildPlatform: "any cpu"
+  RestoreBuildProjects: "**/*.csproj"
+  TestProjects: "**/*[Tt]ests/*.csproj"
+  webapp_name: tailwind-github-demo
+  majorVersion: 2
+  minorVersion: 0
+
+jobs:
+  build:
+    runs-on: windows-latest‘
+    env:
+      solutionDir: TailwindTraders.Website/Source
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 5.x
+    - name: Restore dependencies
+      run: dotnet restore
+    - name: Build
+      run: dotnet build ${{ env.solutionDir }} --no-restore
+    - name: Test
+      run: dotnet test ${{ env.solutionDir }} --no-build --verbosity normal
+  deploy_server:
+    runs-on: windows-latest
+    needs: build
+    steps:
+    - run: echo server ${{ secrets.publishKey}}
+  deploy_client:
+    runs-on: windows-latest
+    needs: [build,deploy_server]
+    steps:
+      - run: echo client ${{ secrets.publishKey}}
