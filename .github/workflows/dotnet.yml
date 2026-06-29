@@ -21,7 +21,7 @@ env:
 
 jobs:
   build:
-    runs-on: windows-latest‘
+    runs-on: ubuntu-latest
     env:
       solutionDir: TailwindTraders.Website/Source
 
