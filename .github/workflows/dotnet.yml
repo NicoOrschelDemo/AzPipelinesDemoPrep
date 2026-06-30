@@ -1,49 +1,128 @@
-# This workflow will build a .NET project
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-net
-
 name: Tailwind Build
 
 on:
   push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+    branches:
+      - main
+
+permissions:
+  contents: read
 
 env:
-  resource-group: "ghazdo-workshops"
-  BuildConfiguration: "Release"
-  BuildPlatform: "any cpu"
-  RestoreBuildProjects: "**/*.csproj"
-  TestProjects: "**/*[Tt]ests/*.csproj"
-  webapp_name: tailwind-github-demo
-  majorVersion: 2
-  minorVersion: 0
+  RESOURCE_GROUP: ghazdo-workshops
+  BUILD_CONFIGURATION: Release
+  BUILD_PLATFORM: any cpu
+  RESTORE_BUILD_PROJECTS: '**/*.csproj'
+  TEST_PROJECTS: '**/*[Tt]ests/*.csproj'
+  WEBAPP_NAME: tailwind-github-demo
+  MAJOR_VERSION: '2'
+  MINOR_VERSION: '0'
+  BUILD_VERSION: ${{ vars.BUILD_VERSION || format('{0}.{1}.{2}', '2', '0', github.run_number) }}
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    env:
-      solutionDir: TailwindTraders.Website/Source
-
+    name: Build on Windows
+    runs-on: windows-latest
     steps:
-    - uses: actions/checkout@v4
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: 5.x
-    - name: Restore dependencies
-      run: dotnet restore ${{ env.solutionDir }}
-    - name: Build
-      run: dotnet build ${{ env.solutionDir }} --no-restore
-    - name: Test
-      run: dotnet test ${{ env.solutionDir }} --no-build --verbosity normal
+      - name: Checkout repository
+        # actions/checkout v7.0.0
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+
+      - name: Setup Node.js
+        # actions/setup-node v6.4.0
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 10.16.3
+
+      - name: Setup .NET SDK
+        # actions/setup-dotnet v5.4.0
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
+        with:
+          dotnet-version: 5.x
+
+      - name: npm install
+        working-directory: TailwindTraders.Website/Source/Tailwind.Traders.Web/ClientApp
+        run: npm install
+
+      - name: Restore
+        shell: pwsh
+        run: |
+          Get-ChildItem -Path . -Recurse -Filter *.csproj |
+            ForEach-Object { dotnet restore $_.FullName }
+
+      - name: Generate AssemblyInfo.cs
+        shell: pwsh
+        run: |
+          $project = Join-Path $env:GITHUB_WORKSPACE 'TailwindTraders.Website\Source\Tailwind.Traders.Web'
+          @"
+          using System.Reflection;
+
+          [assembly: AssemblyVersion("$env:BUILD_VERSION")]
+          [assembly: AssemblyFileVersion("$env:BUILD_VERSION")]
+          [assembly: AssemblyInformationalVersion("$env:BUILD_VERSION")]
+          "@ | Set-Content (Join-Path $project 'GeneratedAssemblyInfo.cs')
+
+      - name: Version AssemblyVersion attributes
+        # mingjun97/file-regex-replace v1
+        uses: mingjun97/file-regex-replace@7d8ae0144cd6660fe8ca5a938ae71ea816a06f47
+        with:
+          regex: 'AssemblyVersion\\("[^"]*"\\)'
+          replacement: 'AssemblyVersion("${{ env.BUILD_VERSION }}")'
+          include: 'AssemblyInfo\.cs$'
+          path: .
+
+      - name: Version AssemblyFileVersion attributes
+        # mingjun97/file-regex-replace v1
+        uses: mingjun97/file-regex-replace@7d8ae0144cd6660fe8ca5a938ae71ea816a06f47
+        with:
+          regex: 'AssemblyFileVersion\\("[^"]*"\\)'
+          replacement: 'AssemblyFileVersion("${{ env.BUILD_VERSION }}")'
+          include: 'AssemblyInfo\.cs$'
+          path: .
+
+      - name: Build
+        shell: pwsh
+        run: |
+          Get-ChildItem -Path . -Recurse -Filter *.csproj |
+            ForEach-Object { dotnet build $_.FullName --configuration $env:BUILD_CONFIGURATION }
+
+      - name: Dependency scanning
+        shell: pwsh
+        run: |
+          Get-ChildItem -Path . -Recurse -Filter *.csproj |
+            ForEach-Object { dotnet list $_.FullName package --vulnerable --include-transitive }
+
+      - name: Test
+        shell: pwsh
+        run: |
+          $testProjects = Get-ChildItem -Path . -Recurse -Filter *.csproj |
+            Where-Object { $_.FullName -match '[Tt]ests' }
+
+          if (-not $testProjects) {
+            Write-Host 'No test projects matched **/*[Tt]ests/*.csproj'
+            exit 0
+          }
+
+          $testProjects | ForEach-Object {
+            dotnet test $_.FullName --configuration $env:BUILD_CONFIGURATION
+          }
+
   deploy_server:
+    name: Deploy with secret (server)
     runs-on: windows-latest
     needs: build
+    environment: prod_server
     steps:
-    - run: echo server ${{ secrets.publishKey}}
+      - name: Deployment with secret
+        run: echo "ServerDeployment with secret ${{ secrets.PUBLISH_KEY }}"
+
   deploy_client:
+    name: Deploy with secret (client)
     runs-on: windows-latest
-    needs: [build,deploy_server]
+    needs:
+      - build
+      - deploy_server
+    environment: prod_client
     steps:
-      - run: echo client ${{ secrets.publishKey}}
+      - name: Deployment with secret
+        run: echo "Client Deployment with secret ${{ secrets.PUBLISH_KEY }}"
